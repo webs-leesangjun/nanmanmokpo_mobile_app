@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "105120815596",
+    "project_id": "mokpo-37802",
+    "storage_bucket": "mokpo-37802.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:105120815596:android:18d1c07452ad16e235c8c9",
+        "android_client_info": {
+          "package_name": "im.ureca.nangmanmokpo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "105120815596-p6d7gbjlv8rst1go13kr8o91v6uneroh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDpwCUzawCNf7q9nJydv4kWIy7ACdmbtbE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "105120815596-p6d7gbjlv8rst1go13kr8o91v6uneroh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
