@@ -67,30 +67,31 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     _configureLocalTimeZone();
     initInfo();
 
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-      RemoteNotification? notification = message.notification;
-      AndroidNotification? android = message.notification?.android;
-      var androidNotiDetails = AndroidNotificationDetails(
-        channel.id,
-        channel.name,
-        channelDescription: channel.description,
-      );
-      // var iOSNotiDetails = const IOSNotificationDetails();
-      // var details =
-      // NotificationDetails(android: androidNotiDetails, iOS: iOSNotiDetails);
-      // if (notification != null) {
-      //   flutterLocalNotificationsPlugin.show(
-      //     notification.hashCode,
-      //     notification.title,
-      //     notification.body,
-      //     details,
-      //   );
-      // }
-    });
-
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      print(message);
-    });
+    // FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+    //   RemoteNotification? notification = message.notification;
+    //   AndroidNotification? android = message.notification?.android;
+    //
+    //   // var androidNotiDetails = AndroidNotificationDetails(
+    //   //   channel.id,
+    //   //   channel.name,
+    //   //   channelDescription: channel.description,
+    //   // );
+    //   // var iOSNotiDetails = const IOSNotificationDetails();
+    //   // var details =
+    //   // NotificationDetails(android: androidNotiDetails, iOS: iOSNotiDetails);
+    //   // if (notification != null) {
+    //   //   flutterLocalNotificationsPlugin.show(
+    //   //     notification.hashCode,
+    //   //     notification.title,
+    //   //     notification.body,
+    //   //     details,
+    //   //   );
+    //   // }
+    // });
+    //
+    // FirebaseMessaging.onMessageOpenedApp.listen((message) {
+    //   print(message);
+    // });
 
     fetchLocation();
   }
