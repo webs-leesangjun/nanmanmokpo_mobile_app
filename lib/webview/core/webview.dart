@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:developer' as developer;
 
+import 'package:activity_recognition_flutter/activity_recognition_flutter.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -7,25 +10,20 @@ import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
-import 'package:location/location.dart';
+import 'package:location/location.dart' as locationLib;
 import 'package:nangmanmokpo/components/dialog/request_permissions_view.dart';
 import 'package:webview_flutter/platform_interface.dart';
-import '../../main.dart';
 import 'webview_controller_extensions.dart';
 import 'webview_functions.dart';
-// import 'package:permission_handler/permission_handler.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'dart:developer' as developer;
+
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 // import 'package:location/location.dart';
 
-const homeUrl = "https://nangmanmokpo.kr/";
-// const homeUrl = "http://192.168.200.196:5500";
-// const homeUrl = "https://portfolio.ureca.im/test/index.html";
-
-// const homeUrl = "http://192.168.123.100:8080";
+const homeUrl = "https://dev.nangmanmokpo.kr/";
 
 class WebViewPage extends StatefulWidget {
   const WebViewPage({Key? key}) : super(key: key);
@@ -35,6 +33,8 @@ class WebViewPage extends StatefulWidget {
 }
 
 class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
+
+  // 웹뷰
   InAppWebViewController? _webViewController;
   InAppWebViewGroupOptions options = InAppWebViewGroupOptions(
       crossPlatform: InAppWebViewOptions(
@@ -49,23 +49,32 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
         allowsInlineMediaPlayback: true,
       ));
 
-  late LocationData _currentPosition;
-  late String _address;
-  Location location = new Location();
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  // Location
+  late locationLib.LocationData _currentPosition;
+  locationLib.Location location = new locationLib.Location();
 
+  // 로컬 FCM 노티
+  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance!.addObserver(this);
-    // WidgetsBinding.instance
-    //     .addPostFrameCallback((_) => {_validatePermissions()});
+    WidgetsBinding.instance.addObserver(this);
 
-    requestFCMPermissions();
-    getDeviceToken();
-    _configureLocalTimeZone();
+    // addPostFrameCallback은 Widget build 이후에 한번만 실행
+    WidgetsBinding.instance.addPostFrameCallback((_) => {_validatePermissions()});
+
+    // 퍼미션 요청
+    requestPermissions();
+
+    // 장치 토큰 반환
+    final deviceToken = getDeviceToken();
+
+    // _configureLocalTimeZone();
     initInfo();
+
+    FlutterNativeSplash.remove();
+    _init();
 
     // FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     //   RemoteNotification? notification = message.notification;
@@ -96,9 +105,33 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     fetchLocation();
   }
 
+  void requestPermissions() async {
+    bool isPassed = await requestPermission();
+
+    requestFCMPermissions();
+  }
+
+  void _init() async {
+    // Android requires explicitly asking permission
+    if (Platform.isAndroid) {
+      if (await Permission.activityRecognition.request().isGranted) {
+        _startTracking();
+      }
+    }
+
+    // iOS does not
+    else {
+      _startTracking();
+    }
+  }
+
+  void _startTracking() {
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance!.removeObserver(this);
+
     super.dispose();
   }
 
@@ -131,6 +164,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
         android: initializationSettingsAndroid,
         iOS: initializationSettingsIOS,
       );
+
       await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
     }
   }
@@ -204,9 +238,8 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
-  /**
-   * 디바이스 토큰 반환
-   */
+
+  /// FCM 발송을 위한 장치 토큰 반환
   Future<String?> getDeviceToken() async {
     return await FirebaseMessaging.instance.getToken();
   }
@@ -216,25 +249,25 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     developer.log('### fetchLocation', name: 'my.app.category');
 
     bool _serviceEnabled;
-    PermissionStatus _permissionGranted;
-
-    _serviceEnabled = await location.serviceEnabled();
-    if (!_serviceEnabled) {
-      _serviceEnabled = await location.requestService();
-      if (!_serviceEnabled) {
-        return;
-      }
-    }
+    // PermissionStatus _permissionGranted;
+    //
+    // _serviceEnabled = await location.serviceEnabled();
+    // if (!_serviceEnabled) {
+    //   _serviceEnabled = await location.requestService();
+    //   if (!_serviceEnabled) {
+    //     return;
+    //   }
+    // }
 
     developer.log('### fetchLocation 222 ', name: 'my.app.category');
 
-    _permissionGranted = await location.hasPermission();
-    if (_permissionGranted == PermissionStatus.denied) {
-      _permissionGranted = await location.requestPermission();
-      if (_permissionGranted != PermissionStatus.granted) {
-        return;
-      }
-    }
+    // _permissionGranted = await Permission.location.isGranted
+    // if (_permissionGranted == PermissionStatus.denied) {
+    //   _permissionGranted = await location.requestPermission();
+    //   if (_permissionGranted != PermissionStatus.granted) {
+    //     return;
+    //   }
+    // }
 
     developer.log('### fetchLocation 333 ', name: 'my.app.category');
 
@@ -242,7 +275,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
     developer.log('latitude: ${_currentPosition.latitude}', name: 'my.app.category');
 
-    location.onLocationChanged.listen((LocationData currentLocation) {
+    location.onLocationChanged.listen((locationLib.LocationData currentLocation) {
       setState(() {
         _currentPosition = currentLocation;
         developer.log('latitude === : ${currentLocation.latitude}', name: 'my.app.category');
@@ -259,14 +292,41 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   }
 
 
+  Future<bool> requestPermission() async {
+    Map<Permission, PermissionStatus> status =
+    await [Permission.location,
+      Permission.activityRecognition,
+      Permission.camera,
+      Permission.notification].request();
+
+    if (await Permission.location.isGranted) {
+      return Future.value(true);
+    } else {
+      return Future.value(false);
+    }
+  }
+
   _validatePermissions() async {
+
+    if (await Permission.location.isDenied) {
+      // 권한 부여가 거부되었습니다.
+    }
+
+    if (await Permission.location.isPermanentlyDenied) {
+      // 권한 부여가 영구적으로 거부되었습니다.
+    }
+
+    if (await Permission.location.isRestricted) {
+      // 권한이 제한되었습니다.
+    }
+
     // if (await Permission.location.isDenied) {
-    //   showDialog(
-    //       context: context,
-    //       barrierDismissible: false,
-    //       builder: (context) {
-    //         return const RequestPermissionsView();
-    //       });
+      showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) {
+            return const RequestPermissionsView();
+          });
     // }
   }
 
@@ -298,11 +358,11 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return WillPopScope(
         child: Scaffold(
-          body: SafeArea(child: _createCustomWebView()),
+            body: SafeArea(child: _createCustomWebView(),
+          ),
           floatingActionButton: FloatingActionButton(
             child: const Icon(Icons.arrow_upward),
             onPressed: () async {
-
               // lo
               final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
               await _registerMessage(
@@ -310,7 +370,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
                 minutes: now.minute + 1,
                 message: 'Hello, world!',
               );
-
 
               _currentPosition = await location.getLocation();
 
@@ -324,7 +383,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
               //
               //   developer.log('javascript method call', name: 'my.app.category');
               //   _webViewController?.evaluateJavascript(
-              //       source: 'fromFlutter("From Flutter")');
+              //       source: 'fromFlutter("From Flutter")');xx
               // }
             },
           ),
@@ -343,6 +402,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
   Widget _createCustomWebView() {
     developer.log('uri: @@@@@', name: 'my.app.category');
+    // final activity = _events[0];
 
     return InAppWebView(
         initialUrlRequest: URLRequest(url: Uri.parse(homeUrl)),
