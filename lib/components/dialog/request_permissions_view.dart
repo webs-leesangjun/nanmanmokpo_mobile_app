@@ -37,7 +37,7 @@ class RequestPermissionsViewState extends State<RequestPermissionsView> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       child: Text(
-                        '• QR코드 인식을 위한 스캔',
+                        '• QR코드 스캔 (포인트 적립 및 이벤트 참여)\n• 프로필 설정 시 사진촬영',
                         style: TextStyle(
                             color: const Color(0xff000000).withOpacity(0.6)),
                       ),
@@ -48,13 +48,13 @@ class RequestPermissionsViewState extends State<RequestPermissionsView> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       child: Text(
-                        '• 점포 찾기 및 지도 위에 현재 위치 표시',
+                        '• 트래킹 코스 정보 제공\n• 관광지 정보 제공',
                         style: TextStyle(
                             color: const Color(0xff000000).withOpacity(0.6)),
                       ),
                     ),
                     const SizedBox(height: 10),
-                    const Text('사용자 활동',
+                    const Text('신체 활동',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -93,7 +93,7 @@ class RequestPermissionsViewState extends State<RequestPermissionsView> {
                   height: 50.0,
                   child: ElevatedButton(
                   onPressed: () {
-                    handlePermissionsCheckClick();
+                    // handlePermissionsCheckClick();
                     close();
                   },
                   style: ElevatedButton.styleFrom(
@@ -111,18 +111,6 @@ class RequestPermissionsViewState extends State<RequestPermissionsView> {
               ),
             ]),
        );
-  }
-
-  void handlePermissionsCheckClick() async {
-    if (await Permission.location.isGranted) {
-      return close();
-    }
-
-    requestPermissions();
-  }
-
-  void requestPermissions() async {
-    await Permission.location.request();
   }
 
   void close() {

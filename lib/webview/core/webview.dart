@@ -62,19 +62,16 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     // addPostFrameCallback은 Widget build 이후에 한번만 실행
-    WidgetsBinding.instance.addPostFrameCallback((_) => {_validatePermissions()});
-
-    // 퍼미션 요청
-    requestPermissions();
-
-    // 장치 토큰 반환
-    final deviceToken = getDeviceToken();
+    WidgetsBinding.instance.addPostFrameCallback((_) => {
+      _widgetBuildAfter()
+    });
 
     // _configureLocalTimeZone();
-    initInfo();
-
     FlutterNativeSplash.remove();
-    _init();
+
+//    initInfo();
+
+//    _init();
 
     // FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     //   RemoteNotification? notification = message.notification;
@@ -102,14 +99,44 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     //   print(message);
     // });
 
-    fetchLocation();
+    // fetchLocation();
   }
 
-  void requestPermissions() async {
-    bool isPassed = await requestPermission();
+  void _widgetBuildAfter() async {
+    // 권한요청
+    final grantedAll = await _requestMultiplePermissions();
+    if (!grantedAll) {
 
-    requestFCMPermissions();
+      _showPermissionsDialog();
+    }
+
+    // 장치 토큰 아이디 요청
+    final deviceToken = await _requestDeviceToken();
+
+    print("### deviceToken " + deviceToken!.toString());
   }
+
+  Future<bool> _requestMultiplePermissions() async {
+    final locationStatus = await Permission.location.request();
+    final cameraStatus = await Permission.camera.request();
+    final activityRecognitionStatus = await Permission.activityRecognition.request();
+    final notificationStatus = await Permission.notification.request();
+    final fcmStatus = await _requestFCMPermissions();
+
+    if (cameraStatus.isGranted && locationStatus.isGranted && activityRecognitionStatus.isGranted && notificationStatus.isGranted && fcmStatus) {
+      return Future.value(true);
+      // 카메라 및 위치 권한이 모두 허용된 경우 처리할 로직 작성
+    }
+
+    // 권한이 거부되었거나 일부 권한이 허용되지 않은 경우 처리할 로직 작성
+    return Future.value(false);
+  }
+
+  Future<String?> _requestDeviceToken() async {
+    return await getDeviceToken();
+  }
+
+
 
   void _init() async {
     // Android requires explicitly asking permission
@@ -291,46 +318,16 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     });
   }
 
-
-  Future<bool> requestPermission() async {
-    Map<Permission, PermissionStatus> status =
-    await [Permission.location,
-      Permission.activityRecognition,
-      Permission.camera,
-      Permission.notification].request();
-
-    if (await Permission.location.isGranted) {
-      return Future.value(true);
-    } else {
-      return Future.value(false);
-    }
+  void _showPermissionsDialog() {
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return const RequestPermissionsView();
+        });
   }
 
-  _validatePermissions() async {
-
-    if (await Permission.location.isDenied) {
-      // 권한 부여가 거부되었습니다.
-    }
-
-    if (await Permission.location.isPermanentlyDenied) {
-      // 권한 부여가 영구적으로 거부되었습니다.
-    }
-
-    if (await Permission.location.isRestricted) {
-      // 권한이 제한되었습니다.
-    }
-
-    // if (await Permission.location.isDenied) {
-      showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) {
-            return const RequestPermissionsView();
-          });
-    // }
-  }
-
-  void requestFCMPermissions() async {
+  Future<bool> _requestFCMPermissions() async {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
 
     NotificationSettings settings = await messaging.requestPermission(
@@ -344,13 +341,18 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      print("User granted permission");
+      // User granted permission
+      print("### User granted permission");
+      return Future.value(true);
     } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
-      print("User granted provisional permission");
+      // User granted provisional permission
+      print("### User granted provisional permission");
+      return Future.value(true);
     } else {
-      print("User declined or has not accepted permission");
+      // User declined or has not accepted permission
+      print("### User declined or has not accepted permission");
+      return Future.value(false);
     }
-
   }
 
 
