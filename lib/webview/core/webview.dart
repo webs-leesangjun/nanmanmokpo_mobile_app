@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:developer' as developer;
 
 import 'package:activity_recognition_flutter/activity_recognition_flutter.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -8,11 +7,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+// import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 import 'package:location/location.dart' as locationLib;
 import 'package:nangmanmokpo/components/dialog/request_permissions_view.dart';
 import 'package:webview_flutter/platform_interface.dart';
+import '../../handler/notificationHandler.dart';
+import '../../service/local_notification_service.dart';
 import 'webview_controller_extensions.dart';
 import 'webview_functions.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -23,7 +24,29 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 // import 'package:location/location.dart';
 
-const homeUrl = "https://dev.nangmanmokpo.kr/";
+// class ReceivedNotification {
+//   ReceivedNotification({
+//     required this.id,
+//     required this.title,
+//     required this.body,
+//     required this.payload,
+//   });
+//
+//   final int id;
+//   final String? title;
+//   final String? body;
+//   final String? payload;
+// }
+
+
+void showLocalNotification(RemoteMessage message) {
+  RemoteNotification? notification = message.notification;
+  AndroidNotification? android = message.notification?.android;
+
+  if (notification != null && android != null) {
+    LocalNotificationService().showNotification(notification.hashCode, notification.title, notification.body, message.data["link"]);
+  }
+}
 
 class WebViewPage extends StatefulWidget {
   const WebViewPage({Key? key}) : super(key: key);
@@ -33,6 +56,7 @@ class WebViewPage extends StatefulWidget {
 }
 
 class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
+  String homeUrl = "https://dev.nangmanmokpo.kr/";
 
   // 웹뷰
   InAppWebViewController? _webViewController;
@@ -53,12 +77,10 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   late locationLib.LocationData _currentPosition;
   locationLib.Location location = new locationLib.Location();
 
-  // 로컬 FCM 노티
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addObserver(this);
 
     // addPostFrameCallback은 Widget build 이후에 한번만 실행
@@ -66,40 +88,72 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
       _widgetBuildAfter()
     });
 
+
+    _configureSelectNotificationSubject();
+
+    // Terminated State
+    FirebaseMessaging.instance.getInitialMessage().then((event) async {
+      if (event != null) {
+        setState(() {
+          notificationMsg = "### Terminate : ${event!.data["link"]}";
+        });
+        final link = event!.data["link"];
+
+        while (_webViewController == null) {
+          // _webViewController가 null이 아닐 때까지 대기
+          await Future.delayed(Duration(milliseconds: 100));
+        }
+        _webViewController!.loadUrl(urlRequest: URLRequest(url: Uri.parse(link)));
+
+        notificationHandler.sendNotification(link);
+      }
+    });
+
+    // Foreground State
+    FirebaseMessaging.onMessage.listen((event) {
+      setState(() {
+        notificationMsg = "### onMessage : ${event!.data["link"]}";
+      });
+      showLocalNotification(event);
+    });
+
+    // Background State
+    FirebaseMessaging.onMessageOpenedApp.listen((event) {
+      setState(() {
+        notificationMsg = "### onMessageOpenedApp : ${event!.data["link"]}";
+        final link = event!.data["link"];
+        notificationHandler.sendNotification(link);
+      });
+    });
+
+    // init();
+
     // _configureLocalTimeZone();
-    FlutterNativeSplash.remove();
-
-//    initInfo();
-
+    // FlutterNativeSplash.remove();
 //    _init();
+    // _fetchLocation();
+  }
 
-    // FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-    //   RemoteNotification? notification = message.notification;
-    //   AndroidNotification? android = message.notification?.android;
-    //
-    //   // var androidNotiDetails = AndroidNotificationDetails(
-    //   //   channel.id,
-    //   //   channel.name,
-    //   //   channelDescription: channel.description,
-    //   // );
-    //   // var iOSNotiDetails = const IOSNotificationDetails();
-    //   // var details =
-    //   // NotificationDetails(android: androidNotiDetails, iOS: iOSNotiDetails);
-    //   // if (notification != null) {
-    //   //   flutterLocalNotificationsPlugin.show(
-    //   //     notification.hashCode,
-    //   //     notification.title,
-    //   //     notification.body,
-    //   //     details,
-    //   //   );
-    //   // }
-    // });
-    //
-    // FirebaseMessaging.onMessageOpenedApp.listen((message) {
-    //   print(message);
-    // });
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
-    // fetchLocation();
+  void _configureSelectNotificationSubject() {
+    notificationHandler.selectNotificationStream.stream.listen((String? payload) {
+      // 선택 알림 처리 로직
+      if (payload != null) {
+        print('### 선택 알림: $payload');
+        bool nullable = false;
+        if (_webViewController == null) {
+          nullable = true;
+        }
+        print('### wc : ' + nullable.toString());
+        _webViewController!.loadUrl(urlRequest: URLRequest(url: Uri.parse(payload)));
+        // 추가 작업 수행
+      }
+    });
   }
 
   void _widgetBuildAfter() async {
@@ -112,7 +166,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
     // 장치 토큰 아이디 요청
     final deviceToken = await _requestDeviceToken();
-
     print("### deviceToken " + deviceToken!.toString());
   }
 
@@ -136,8 +189,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     return await getDeviceToken();
   }
 
-
-
   void _init() async {
     // Android requires explicitly asking permission
     if (Platform.isAndroid) {
@@ -156,13 +207,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   }
 
   @override
-  void dispose() {
-    WidgetsBinding.instance!.removeObserver(this);
-
-    super.dispose();
-  }
-
-  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       FlutterAppBadger.removeBadge();
@@ -175,139 +219,32 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     tz.setLocalLocation(tz.getLocation(timeZoneName!));
   }
 
-  initInfo() {
-    Future<void> _initializeNotification() async {
-      const DarwinInitializationSettings initializationSettingsIOS =
-      DarwinInitializationSettings(
-        requestAlertPermission: false,
-        requestBadgePermission: false,
-        requestSoundPermission: false,
-      );
-      const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
-
-      const InitializationSettings initializationSettings =
-      InitializationSettings(
-        android: initializationSettingsAndroid,
-        iOS: initializationSettingsIOS,
-      );
-
-      await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
-    }
-  }
-
-  void onDidReceiveLocalNotification(
-      int id, String? title, String? body, String? payload) async {
-    // display a dialog with the notification details, tap ok to go to another page
-
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) => CupertinoAlertDialog(
-        title: Text(title ?? ''),
-        content: Text(body ?? ''),
-        actions: [
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            child: Text('Ok'),
-            onPressed: () async {
-              // Navigator.of(context, rootNavigator: true).pop();
-              // await Navigator.push(
-              //   context,
-              //   // MaterialPageRoute(
-              //   //   builder: (context) => SecondScreen(payload),
-              //   // ),
-              // );
-            },
-          )
-        ],
-      ),
-    );
-  }
-
-  Future<void> _registerMessage({
-    required int hour,
-    required int minutes,
-    required message,
-  }) async {
-    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-    tz.TZDateTime scheduledDate = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      hour,
-      minutes,
-    );
-
-    await _flutterLocalNotificationsPlugin.zonedSchedule(
-      0,
-      'flutter_local_notifications',
-      message,
-      scheduledDate,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          'channel id',
-          'channel name',
-          importance: Importance.max,
-          priority: Priority.high,
-          ongoing: true,
-          styleInformation: BigTextStyleInformation(message),
-          icon: 'ic_notification',
-        ),
-        iOS: const DarwinNotificationDetails(
-          badgeNumber: 1,
-        ),
-      ),
-      androidAllowWhileIdle: true,
-      uiLocalNotificationDateInterpretation:
-      UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
-  }
 
   /// FCM 발송을 위한 장치 토큰 반환
   Future<String?> getDeviceToken() async {
     return await FirebaseMessaging.instance.getToken();
   }
 
-  fetchLocation() async {
-
-    developer.log('### fetchLocation', name: 'my.app.category');
-
-    bool _serviceEnabled;
-    // PermissionStatus _permissionGranted;
-    //
-    // _serviceEnabled = await location.serviceEnabled();
-    // if (!_serviceEnabled) {
-    //   _serviceEnabled = await location.requestService();
-    //   if (!_serviceEnabled) {
-    //     return;
-    //   }
-    // }
-
-    developer.log('### fetchLocation 222 ', name: 'my.app.category');
-
-    // _permissionGranted = await Permission.location.isGranted
-    // if (_permissionGranted == PermissionStatus.denied) {
-    //   _permissionGranted = await location.requestPermission();
-    //   if (_permissionGranted != PermissionStatus.granted) {
-    //     return;
-    //   }
-    // }
-
-    developer.log('### fetchLocation 333 ', name: 'my.app.category');
+  /// 현재 위치의 위도, 경도, 속도
+  void _fetchLocation() async {
+    bool serviceEnabled = await location.serviceEnabled();
+    if (!serviceEnabled) {
+      serviceEnabled = await location.requestService();
+      if (!serviceEnabled) {
+        return;
+      }
+    }
 
     _currentPosition = await location.getLocation();
 
-    developer.log('latitude: ${_currentPosition.latitude}', name: 'my.app.category');
+    print('latitude: ${_currentPosition.latitude}');
 
     location.onLocationChanged.listen((locationLib.LocationData currentLocation) {
       setState(() {
         _currentPosition = currentLocation;
-        developer.log('latitude === : ${currentLocation.latitude}', name: 'my.app.category');
-
+        print('latitude === : ${currentLocation.latitude}');
         _webViewController?.evaluateJavascript(source: 'receivedLocation(${currentLocation.longitude}, ${currentLocation.latitude}, ${currentLocation.speed})');
+
         // getAddress(_currentPosition.latitude, _currentPosition.longitude)
         //     .then((value) {
         //   setState(() {
@@ -318,6 +255,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     });
   }
 
+  /// 모든 퍼미션이 허용이 아닐때 다이얼로그 보여줌
   void _showPermissionsDialog() {
     showDialog(
         context: context,
@@ -327,6 +265,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
         });
   }
 
+  /// FCM 퍼미션 요청
   Future<bool> _requestFCMPermissions() async {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
 
@@ -355,32 +294,60 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     }
   }
 
+  /**
+   * iOS 권한을 요청하는 함수
+   */
+  Future _reqIOSPermission(FirebaseMessaging fbMsg) async {
+    NotificationSettings settings = await fbMsg.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+  }
+
+  String notificationMsg = "Waiting for notification";
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
         child: Scaffold(
-            body: SafeArea(child: _createCustomWebView(),
+            body: SafeArea(
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 100,
+                      child: Text(notificationMsg, textAlign: TextAlign.center)
+                  ),
+                  Expanded(child: _createCustomWebView()),
+                ],
+              ),
           ),
           floatingActionButton: FloatingActionButton(
             child: const Icon(Icons.arrow_upward),
             onPressed: () async {
               // lo
-              final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-              await _registerMessage(
-                hour: now.hour,
-                minutes: now.minute + 1,
-                message: 'Hello, world!',
-              );
 
-              _currentPosition = await location.getLocation();
+              await LocalNotificationService().showNotificationWithActions();
 
-              developer.log('latitude : ${_currentPosition.latitude}', name: 'my.app.category');
-              developer.log('longitude : ${_currentPosition.longitude}', name: 'my.app.category');
-              developer.log('speed : ${_currentPosition.speed}', name: 'my.app.category');
+              // final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+              // await _registerMessage(
+              //   hour: now.hour,
+              //   minutes: now.minute + 1,
+              //   message: 'Hello, world!',
+              // );
+              //
+              // _currentPosition = await location.getLocation();
+              //
+              // developer.log('latitude : ${_currentPosition.latitude}', name: 'my.app.category');
+              // developer.log('longitude : ${_currentPosition.longitude}', name: 'my.app.category');
+              // developer.log('speed : ${_currentPosition.speed}', name: 'my.app.category');
 
 
-              _webViewController?.evaluateJavascript(source: 'receivedLocation(${_currentPosition.longitude}, ${_currentPosition.latitude}, ${_currentPosition.speed})');
+              // _webViewController?.evaluateJavascript(source: 'receivedLocation(${_currentPosition.longitude}, ${_currentPosition.latitude}, ${_currentPosition.speed})');
               // if (_webViewController != null) {
               //
               //   developer.log('javascript method call', name: 'my.app.category');
@@ -403,23 +370,21 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   }
 
   Widget _createCustomWebView() {
-    developer.log('uri: @@@@@', name: 'my.app.category');
-    // final activity = _events[0];
-
     return InAppWebView(
         initialUrlRequest: URLRequest(url: Uri.parse(homeUrl)),
         initialOptions: options,
         onWebViewCreated: (InAppWebViewController controller) {
-          _webViewController = controller;
+          setState(() {
+            _webViewController = controller;
+          });
         },
         onCreateWindow: (_, createWindowAction) =>
             showSubDialogWebView(context, createWindowAction),
         shouldOverrideUrlLoading: (controller, shouldOverrideUrlLoadingRequest) async {
           Uri? uri = shouldOverrideUrlLoadingRequest.request.url;
-          developer.log('uri: ${uri.toString()}', name: 'my.app.category');
-          developer.log('uri host: ${uri?.host}', name: 'my.app.category');
+          print('uri: ${uri.toString()}');
+          print('uri host: ${uri?.host}');
 
-          // debugPrint('uri host: ${uri?.host}');
           // 맵 URI화면에 오면, GPS데이터 자바스크립트로 전송
 
           // if ((uri.toString()).startsWith('https://google.com')) {
@@ -431,7 +396,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
           return NavigationActionPolicy.ALLOW;
         },
         onLoadStop: (_, __) {
-          developer.log("### DONE ###");
           FlutterNativeSplash.remove();
         },
         androidOnPermissionRequest: handleAndroidOnPermissionRequest,
@@ -442,9 +406,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   Future<bool> _handleGoBack(BuildContext context) async {
     if (_webViewController == null) return true;
     return _webViewController!.ifCanGoBackThenGoBack(context);
-  }
-
-  void onDidReceiveNotificationResponse(NotificationResponse details) {
   }
 }
 
