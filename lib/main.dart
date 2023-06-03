@@ -21,6 +21,13 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // showLocalNotification(message);
   // If you're going to use other Firebase services in the background, such as Firestore,
   // make sure you call `initializeApp` before using other Firebase services.
+  RemoteNotification? notification = message.notification;
+  AndroidNotification? android = message.notification?.android;
+
+  // if (notification != null && android != null) {
+    LocalNotificationService().showNotification(notification.hashCode, message.data["title"], message.data["body"], message.data["link"]);
+  // }
+
   print('## Handling a background message ${message.messageId}');
 }
 

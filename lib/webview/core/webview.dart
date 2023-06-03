@@ -11,6 +11,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 import 'package:location/location.dart' as locationLib;
 import 'package:nangmanmokpo/components/dialog/request_permissions_view.dart';
+import 'package:pedometer/pedometer.dart';
 import 'package:webview_flutter/platform_interface.dart';
 import '../../handler/notificationHandler.dart';
 import '../../service/local_notification_service.dart';
@@ -57,6 +58,10 @@ class WebViewPage extends StatefulWidget {
 
 class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   String homeUrl = "https://dev.nangmanmokpo.kr/";
+  StreamSubscription<PedestrianStatus>? pedestrianStatusSubscription;
+  StreamSubscription<StepCount>? stepCountStreamSubscription;
+
+  String _status = '?', _steps = '?';
 
   // 웹뷰
   InAppWebViewController? _webViewController;
@@ -75,7 +80,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
   // Location
   late locationLib.LocationData _currentPosition;
-  locationLib.Location location = new locationLib.Location();
+  locationLib.Location location = locationLib.Location();
 
   @override
   void initState() {
@@ -87,7 +92,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) => {
       _widgetBuildAfter()
     });
-
 
     _configureSelectNotificationSubject();
 
@@ -127,16 +131,20 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     });
 
     // init();
-
     // _configureLocalTimeZone();
     // FlutterNativeSplash.remove();
 //    _init();
-    // _fetchLocation();
+
+    _fetchLocation();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+
+    stopListeningToPedestrianStatus();
+    stopListeningToPedestrianStep();
+
     super.dispose();
   }
 
@@ -156,12 +164,58 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     });
   }
 
-  void _widgetBuildAfter() async {
-    // 권한요청
-    final grantedAll = await _requestMultiplePermissions();
-    if (!grantedAll) {
+  Future<bool> checkLocationPermission() async {
+    PermissionStatus status = await Permission.location.status;
 
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+    NotificationSettings settings = await messaging.requestPermission(
+        alert: true,
+        announcement: true,
+        badge: true,
+        carPlay: true,
+        criticalAlert: true,
+        provisional: true,
+        sound: true
+    );
+
+    return status.isGranted;
+  }
+
+  Future<bool> checkCameraPermission() async {
+    PermissionStatus status = await Permission.camera.status;
+    return status.isGranted;
+  }
+
+  Future<bool> checkActivityRecognitionPermission() async {
+    PermissionStatus status = await Permission.activityRecognition.status;
+    return status.isGranted;
+  }
+
+  Future<bool> checkNotificationPermission() async {
+    PermissionStatus status = await Permission.notification.status;
+    return status.isGranted;
+  }
+
+  void _widgetBuildAfter() async {
+
+    // 권한 확인
+    final locationStatus = await checkLocationPermission();
+    final cameraStatus = await checkCameraPermission();
+    final activityRecognitionStatus = await checkActivityRecognitionPermission();
+    final notificationStatus = await checkNotificationPermission();
+    final fcmStatus = await _requestFCMPermissions();
+
+    if (locationStatus && cameraStatus && activityRecognitionStatus && notificationStatus && fcmStatus) {
+      // 카메라 및 위치 권한이 모두 허용된 경우 처리할 로직 작성
+    } else {
+      _requestMultiplePermissions();
       _showPermissionsDialog();
+    }
+
+    if (activityRecognitionStatus)  {
+      startListeningToPedestrianStatus();
+      startListeningToPedestrianStep();
     }
 
     // 장치 토큰 아이디 요청
@@ -189,23 +243,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     return await getDeviceToken();
   }
 
-  void _init() async {
-    // Android requires explicitly asking permission
-    if (Platform.isAndroid) {
-      if (await Permission.activityRecognition.request().isGranted) {
-        _startTracking();
-      }
-    }
-
-    // iOS does not
-    else {
-      _startTracking();
-    }
-  }
-
-  void _startTracking() {
-  }
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -218,7 +255,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     final String? timeZoneName = await FlutterNativeTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(timeZoneName!));
   }
-
 
   /// FCM 발송을 위한 장치 토큰 반환
   Future<String?> getDeviceToken() async {
@@ -241,8 +277,11 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
     location.onLocationChanged.listen((locationLib.LocationData currentLocation) {
       setState(() {
+
         _currentPosition = currentLocation;
         print('latitude === : ${currentLocation.latitude}');
+        print('longitude === : ${currentLocation.longitude}');
+
         _webViewController?.evaluateJavascript(source: 'receivedLocation(${currentLocation.longitude}, ${currentLocation.latitude}, ${currentLocation.speed})');
 
         // getAddress(_currentPosition.latitude, _currentPosition.longitude)
@@ -281,15 +320,15 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
       // User granted permission
-      print("### User granted permission");
+      print("### User FCM granted permission");
       return Future.value(true);
     } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
       // User granted provisional permission
-      print("### User granted provisional permission");
+      print("### User FCM granted provisional permission");
       return Future.value(true);
     } else {
       // User declined or has not accepted permission
-      print("### User declined or has not accepted permission");
+      print("### User FCM declined or has not accepted permission");
       return Future.value(false);
     }
   }
@@ -320,7 +359,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
                 children: [
                   SizedBox(
                     height: 100,
-                      child: Text(notificationMsg, textAlign: TextAlign.center)
+                      child: Text("${_status} ${_steps}", textAlign: TextAlign.center)
                   ),
                   Expanded(child: _createCustomWebView()),
                 ],
@@ -339,13 +378,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
               //   minutes: now.minute + 1,
               //   message: 'Hello, world!',
               // );
-              //
-              // _currentPosition = await location.getLocation();
-              //
-              // developer.log('latitude : ${_currentPosition.latitude}', name: 'my.app.category');
-              // developer.log('longitude : ${_currentPosition.longitude}', name: 'my.app.category');
-              // developer.log('speed : ${_currentPosition.speed}', name: 'my.app.category');
-
 
               // _webViewController?.evaluateJavascript(source: 'receivedLocation(${_currentPosition.longitude}, ${_currentPosition.latitude}, ${_currentPosition.speed})');
               // if (_webViewController != null) {
@@ -407,6 +439,63 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     if (_webViewController == null) return true;
     return _webViewController!.ifCanGoBackThenGoBack(context);
   }
+
+  void startListeningToPedestrianStatus() {
+    pedestrianStatusSubscription = Pedometer.pedestrianStatusStream.listen(
+          (PedestrianStatus status) {
+
+        // 보행자 상태 변화에 대한 처리
+        print('보행자 상태: ${status.status}');
+        _webViewController?.evaluateJavascript(source: 'receivedPedestrianStatus(${status.status}');
+
+        setState(() {
+          _status = status.status;
+        });
+      },
+    );
+  }
+
+  void stopListeningToPedestrianStatus() {
+    pedestrianStatusSubscription?.cancel();
+  }
+
+  void startListeningToPedestrianStep() {
+    stepCountStreamSubscription = Pedometer.stepCountStream.listen(
+          (StepCount event) {
+        // 보행자 상태 변화에 대한 처리
+        print('보행자 걸음수: ${event.steps}');
+
+        _webViewController?.evaluateJavascript(source: 'receivedPedestrianStep(${event.steps}');
+
+        setState(() {
+          _steps = event.steps.toString();
+        });
+      },
+      onError: onStepCountError,
+      onDone: onStepCountDone,
+    );
+  }
+
+  void stopListeningToPedestrianStep() {
+    stepCountStreamSubscription?.cancel();
+  }
+
+
+  void onPedestrianStatusError(error) {
+    print("### onPedestrianStatusError: $error");
+    _status = 'Pedestrian Status not available';
+
+  }
+
+  void onStepCountDone() {
+    print("### onStepCountDone");
+  }
+
+  void onStepCountError(error) {
+    print("### onStepCountError: $error");
+    _steps = 'Step Count not available';
+  }
+
 }
 
 Future<PermissionRequestResponse?> handleAndroidOnPermissionRequest(
