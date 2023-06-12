@@ -12,6 +12,9 @@ class RequestPermissionsViewState extends State<RequestPermissionsView> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+        scrollable: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(20.0))),
         content: Column(
             mainAxisSize: MainAxisSize.min,
             // crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,7 +62,7 @@ class RequestPermissionsViewState extends State<RequestPermissionsView> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       child: Text(
-                        '• 만보기',
+                        '• 만보기 걸음수',
                         style: TextStyle(
                             color: const Color(0xff000000).withOpacity(0.6)),
                       ),
