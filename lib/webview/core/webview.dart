@@ -1,23 +1,29 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:activity_recognition_flutter/activity_recognition_flutter.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+// import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 import 'package:location/location.dart' as locationLib;
 import 'package:nangmanmokpo/components/dialog/request_permissions_view.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:webview_flutter/platform_interface.dart';
+import '../../handler/notificationHandler.dart';
 import '../../service/local_notification_service.dart';
 import 'webview_controller_extensions.dart';
 import 'webview_functions.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
+import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+// import 'package:location/location.dart';
 
 // class ReceivedNotification {
 //   ReceivedNotification({
@@ -38,8 +44,8 @@ void showLocalNotification(RemoteMessage message) {
   RemoteNotification? notification = message.notification;
   AndroidNotification? android = message.notification?.android;
 
-  if (message.data["title"] != null) {
-    LocalNotificationService().showNotification(notification.hashCode, message.data["title"], message.data["body"], message.data["link"]);
+  if (notification != null && android != null) {
+    LocalNotificationService().showNotification(notification.hashCode, notification.title, notification.body, message.data["link"]);
   }
 }
 
@@ -129,7 +135,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     // FlutterNativeSplash.remove();
 //    _init();
 
-    // _fetchLocation();
+    _fetchLocation();
   }
 
   @override
@@ -160,6 +166,19 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
   Future<bool> checkLocationPermission() async {
     PermissionStatus status = await Permission.location.status;
+
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+    NotificationSettings settings = await messaging.requestPermission(
+        alert: true,
+        announcement: true,
+        badge: true,
+        carPlay: true,
+        criticalAlert: true,
+        provisional: true,
+        sound: true
+    );
+
     return status.isGranted;
   }
 
@@ -179,6 +198,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   }
 
   void _widgetBuildAfter() async {
+
     // 권한 확인
     final locationStatus = await checkLocationPermission();
     final cameraStatus = await checkCameraPermission();
@@ -204,18 +224,18 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   }
 
   Future<bool> _requestMultiplePermissions() async {
+    final locationStatus = await Permission.location.request();
     final cameraStatus = await Permission.camera.request();
     final activityRecognitionStatus = await Permission.activityRecognition.request();
     final notificationStatus = await Permission.notification.request();
     final fcmStatus = await _requestFCMPermissions();
-    final locationStatus = await Permission.location.request();
 
     if (cameraStatus.isGranted && locationStatus.isGranted && activityRecognitionStatus.isGranted && notificationStatus.isGranted && fcmStatus) {
       return Future.value(true);
       // 카메라 및 위치 권한이 모두 허용된 경우 처리할 로직 작성
     }
 
-    // 권한이 거부되었거나 일부 권한이 허용되지 않은 경우 처리할 로직 작성x
+    // 권한이 거부되었거나 일부 권한이 허용되지 않은 경우 처리할 로직 작성
     return Future.value(false);
   }
 
@@ -257,6 +277,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
     location.onLocationChanged.listen((locationLib.LocationData currentLocation) {
       setState(() {
+
         _currentPosition = currentLocation;
         print('latitude === : ${currentLocation.latitude}');
         print('longitude === : ${currentLocation.longitude}');
@@ -336,37 +357,37 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
             body: SafeArea(
               child: Column(
                 children: [
-                  // SizedBox(
-                  //   height: 40,
-                  //     child: Text("${_status} ${_steps}", textAlign: TextAlign.center)
-                  // ),
+                  SizedBox(
+                    height: 100,
+                      child: Text("${_status} ${_steps}", textAlign: TextAlign.center)
+                  ),
                   Expanded(child: _createCustomWebView()),
                 ],
               ),
           ),
-          // floatingActionButton: FloatingActionButton(
-          //   child: const Icon(Icons.arrow_upward),
-          //   onPressed: () async {
-          //     // lo
-          //
-          //     await LocalNotificationService().showNotificationWithActions();
-          //
-          //     // final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-          //     // await _registerMessage(
-          //     //   hour: now.hour,
-          //     //   minutes: now.minute + 1,
-          //     //   message: 'Hello, world!',
-          //     // );
-          //
-          //     // _webViewController?.evaluateJavascript(source: 'receivedLocation(${_currentPosition.longitude}, ${_currentPosition.latitude}, ${_currentPosition.speed})');
-          //     // if (_webViewController != null) {
-          //     //
-          //     //   developer.log('javascript method call', name: 'my.app.category');
-          //     //   _webViewController?.evaluateJavascript(
-          //     //       source: 'fromFlutter("From Flutter")');xx
-          //     // }
-          //   },
-          // ),
+          floatingActionButton: FloatingActionButton(
+            child: const Icon(Icons.arrow_upward),
+            onPressed: () async {
+              // lo
+
+              await LocalNotificationService().showNotificationWithActions();
+
+              // final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+              // await _registerMessage(
+              //   hour: now.hour,
+              //   minutes: now.minute + 1,
+              //   message: 'Hello, world!',
+              // );
+
+              // _webViewController?.evaluateJavascript(source: 'receivedLocation(${_currentPosition.longitude}, ${_currentPosition.latitude}, ${_currentPosition.speed})');
+              // if (_webViewController != null) {
+              //
+              //   developer.log('javascript method call', name: 'my.app.category');
+              //   _webViewController?.evaluateJavascript(
+              //       source: 'fromFlutter("From Flutter")');xx
+              // }
+            },
+          ),
         ),
         onWillPop: () => _handleGoBack(context));
   }
@@ -398,29 +419,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
           // 맵 URI화면에 오면, GPS데이터 자바스크립트로 전송
 
-          if ((uri.toString()).contains('company')) {
-            _fetchLocation();
-          }
-
-          if ((uri.toString()).contains('/my/my_walk')) {
-            // 권한이 없으면 권한 요청
-            final permission = await checkActivityRecognitionPermission();
-            if (permission == false) {
-              _showPermissionsDialog();
-              return NavigationActionPolicy.CANCEL;
-            } else {
-                startListeningToPedestrianStatus();
-                startListeningToPedestrianStep();
-            }
-          }
-
-          if ((uri.toString()).contains('qr')) {
-            final permission = await checkCameraPermission();
-            if (permission == false) {
-              _showPermissionsDialog();
-              return NavigationActionPolicy.CANCEL;
-            }
-          }
+          // if ((uri.toString()).startsWith('https://google.com')) {
           //   return NavigationActionPolicy.ALLOW;
           // } else {
           //   launchURL(uri.toString());
@@ -447,7 +446,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
         // 보행자 상태 변화에 대한 처리
         print('보행자 상태: ${status.status}');
-        _webViewController?.evaluateJavascript(source: 'receivedPedestrianStatus("${status.status}")');
+        _webViewController?.evaluateJavascript(source: 'receivedPedestrianStatus(${status.status}');
 
         setState(() {
           _status = status.status;
@@ -465,7 +464,8 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
           (StepCount event) {
         // 보행자 상태 변화에 대한 처리
         print('보행자 걸음수: ${event.steps}');
-        _webViewController?.evaluateJavascript(source: 'receivedPedestrianStep(${event.steps})');
+
+        _webViewController?.evaluateJavascript(source: 'receivedPedestrianStep(${event.steps}');
 
         setState(() {
           _steps = event.steps.toString();
