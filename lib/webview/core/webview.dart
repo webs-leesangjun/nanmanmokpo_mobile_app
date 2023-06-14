@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/cupertino.dart';
@@ -169,7 +170,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   }
 
   Future<bool> checkActivityRecognitionPermission() async {
-    PermissionStatus status = await Permission.activityRecognition.status;
+    PermissionStatus status = await getMotionPermission().status;
     return status.isGranted;
   }
 
@@ -180,15 +181,24 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
   void _widgetBuildAfter() async {
     // 권한 확인
+    // final activityRecognitionStatus12 = await Permission.activityRecognition.request();
+
     final locationStatus = await checkLocationPermission();
     final cameraStatus = await checkCameraPermission();
     final activityRecognitionStatus = await checkActivityRecognitionPermission();
     final notificationStatus = await checkNotificationPermission();
     final fcmStatus = await _requestFCMPermissions();
 
+    print("### 1 " + locationStatus.toString());
+    print("### 2 " + cameraStatus.toString());
+    print("### 3 " + activityRecognitionStatus.toString());
+    print("### 4 " + notificationStatus.toString());
+    print("### 5 " + fcmStatus.toString());
+
     if (locationStatus && cameraStatus && activityRecognitionStatus && notificationStatus && fcmStatus) {
       // 카메라 및 위치 권한이 모두 허용된 경우 처리할 로직 작성
     } else {
+      // openAppSettings();
       _requestMultiplePermissions();
       _showPermissionsDialog();
     }
@@ -203,12 +213,24 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     print("### deviceToken " + deviceToken!.toString());
   }
 
+  Permission getMotionPermission() {
+    if(Platform.isAndroid /** Also check if SDK >= 29 **/){
+      return Permission.activityRecognition;
+    } else if(Platform.isIOS) {
+      return Permission.sensors;
+    }
+
+    return Permission.sensors;
+  }
+
   Future<bool> _requestMultiplePermissions() async {
     final cameraStatus = await Permission.camera.request();
-    final activityRecognitionStatus = await Permission.activityRecognition.request();
     final notificationStatus = await Permission.notification.request();
     final fcmStatus = await _requestFCMPermissions();
     final locationStatus = await Permission.location.request();
+
+    Permission motionPermission = getMotionPermission();
+    final activityRecognitionStatus = await motionPermission.request();
 
     if (cameraStatus.isGranted && locationStatus.isGranted && activityRecognitionStatus.isGranted && notificationStatus.isGranted && fcmStatus) {
       return Future.value(true);
@@ -333,8 +355,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return WillPopScope(
         child: Scaffold(
-            body: SafeArea(
-              child: Column(
+            body: Column(
                 children: [
                   // SizedBox(
                   //   height: 40,
@@ -344,30 +365,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
                 ],
               ),
           ),
-          // floatingActionButton: FloatingActionButton(
-          //   child: const Icon(Icons.arrow_upward),
-          //   onPressed: () async {
-          //     // lo
-          //
-          //     await LocalNotificationService().showNotificationWithActions();
-          //
-          //     // final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-          //     // await _registerMessage(
-          //     //   hour: now.hour,
-          //     //   minutes: now.minute + 1,
-          //     //   message: 'Hello, world!',
-          //     // );
-          //
-          //     // _webViewController?.evaluateJavascript(source: 'receivedLocation(${_currentPosition.longitude}, ${_currentPosition.latitude}, ${_currentPosition.speed})');
-          //     // if (_webViewController != null) {
-          //     //
-          //     //   developer.log('javascript method call', name: 'my.app.category');
-          //     //   _webViewController?.evaluateJavascript(
-          //     //       source: 'fromFlutter("From Flutter")');xx
-          //     // }
-          //   },
-          // ),
-        ),
         onWillPop: () => _handleGoBack(context));
   }
 
