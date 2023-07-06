@@ -1,23 +1,29 @@
 # nangmanmokpo
 
-A new Flutter project.
+### IOS APN 인증 키 파일
 
-## Getting Started
+- ios/AuthKey_Q67KY7VGNS.p8
 
-This project is a starting point for a Flutter application.
+### 안드로이드 Apk 생성
+```bash
+flutter build apk --release --target-platform=android-arm64 
+```
 
-A few resources to get you started if this is your first Flutter project:
+### IOS Testflight 업로드
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- xcode 에서 Product 메뉴 > Archive 클릭 
+- Distribute App 버튼 클릭 
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+
 
 - firebase_options 파일 생성
+```bash
   flutterfire configure --project=mokpo --out=lib/firebase_options.dart --ios-bundle-id=im.ureca.nangmanmokpo --android-app-id=im.ureca.nangmanmokpo 
+```
+
 
 참고
 https://github.com/firebase/flutterfire/blob/master/packages/firebase_messaging/firebase_messaging/example/lib/firebase_options.dart
 https://www.youtube.com/watch?v=imaPNoiH3I4
+
+

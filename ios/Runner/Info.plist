@@ -33,8 +33,18 @@
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
 	</dict>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Play using while you are hiking</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Allow Bluetooth Access</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Allow Bluetooth Access</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Allow Calendars Access</string>
 	<key>NSCameraUsageDescription</key>
 	<string>QR코드 스캔을 위한 카메라 권한을 요청합니다.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Allow Contact Access</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>만보기 기능 사용을 위해 위치정보 권한이 필요합니다.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
@@ -49,12 +59,19 @@
 	<string>QR코드 스캔을 위한 카메라 권한을 요청합니다.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UIStatusBarHidden</key>
 	<true/>
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleDarkContent</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

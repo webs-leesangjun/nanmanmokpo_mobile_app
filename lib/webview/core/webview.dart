@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
@@ -125,6 +126,8 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
       });
     });
 
+
+
     // init();
     // _configureLocalTimeZone();
     // FlutterNativeSplash.remove();
@@ -189,12 +192,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     final notificationStatus = await checkNotificationPermission();
     final fcmStatus = await _requestFCMPermissions();
 
-    print("### 1 " + locationStatus.toString());
-    print("### 2 " + cameraStatus.toString());
-    print("### 3 " + activityRecognitionStatus.toString());
-    print("### 4 " + notificationStatus.toString());
-    print("### 5 " + fcmStatus.toString());
-
     if (locationStatus && cameraStatus && activityRecognitionStatus && notificationStatus && fcmStatus) {
       // 카메라 및 위치 권한이 모두 허용된 경우 처리할 로직 작성
     } else {
@@ -209,8 +206,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     }
 
     // 장치 토큰 아이디 요청
-    final deviceToken = await _requestDeviceToken();
-    print("### deviceToken " + deviceToken!.toString());
+    // print("### deviceToken " + deviceToken!.toString());
   }
 
   Permission getMotionPermission() {
@@ -225,6 +221,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
   Future<bool> _requestMultiplePermissions() async {
     final cameraStatus = await Permission.camera.request();
+    // final microphoneStatus = await Permission.microphone.request();
     final notificationStatus = await Permission.notification.request();
     final fcmStatus = await _requestFCMPermissions();
     final locationStatus = await Permission.location.request();
@@ -355,16 +352,22 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return WillPopScope(
         child: Scaffold(
-            body: Column(
-                children: [
-                  // SizedBox(
-                  //   height: 40,
-                  //     child: Text("${_status} ${_steps}", textAlign: TextAlign.center)
-                  // ),
-                  Expanded(child: _createCustomWebView()),
-                ],
-              ),
+          body: Container(
+            color: Colors.transparent,
+            child: SafeArea(
+                child: Column(
+                    children: [
+                      // SizedBox(
+                      //   height: 40,
+                      //     child: Text("${_status} ${_steps}", textAlign: TextAlign.center)
+                      // ),
+                      Expanded(child: _createCustomWebView()),
+                    ],
+                  ),
+              // ),
+            ),
           ),
+        ),
         onWillPop: () => _handleGoBack(context));
   }
 
@@ -385,6 +388,15 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
           setState(() {
             _webViewController = controller;
           });
+
+          controller.addJavaScriptHandler(handlerName: 'requestDeviceId', callback: (args) async {
+            // print arguments coming from the JavaScript side!
+            String? deviceToken = await _requestDeviceToken() ?? "";
+
+            print("#### dev " + deviceToken);
+
+            return deviceToken;
+          });
         },
         onCreateWindow: (_, createWindowAction) =>
             showSubDialogWebView(context, createWindowAction),
@@ -394,7 +406,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
           print('uri host: ${uri?.host}');
 
           // 맵 URI화면에 오면, GPS데이터 자바스크립트로 전송
-
           if ((uri.toString()).contains('company')) {
             _fetchLocation();
           }
@@ -477,11 +488,9 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     stepCountStreamSubscription?.cancel();
   }
 
-
   void onPedestrianStatusError(error) {
     print("### onPedestrianStatusError: $error");
     _status = 'Pedestrian Status not available';
-
   }
 
   void onStepCountDone() {
@@ -492,7 +501,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     print("### onStepCountError: $error");
     _steps = 'Step Count not available';
   }
-
 }
 
 Future<PermissionRequestResponse?> handleAndroidOnPermissionRequest(
