@@ -53,7 +53,7 @@ class WebViewPage extends StatefulWidget {
 }
 
 class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
-  String homeUrl = "https://dev.nangmanmokpo.kr/";
+  String homeUrl = "https://nangmanmokpo.kr/";
   StreamSubscription<PedestrianStatus>? pedestrianStatusSubscription;
   StreamSubscription<StepCount>? stepCountStreamSubscription;
 
